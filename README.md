@@ -5,18 +5,20 @@ First script to run would be logs-extractor.py
 Server Admins often would give logs in archived form (.zip, .tar, .tar.gz etc.) and this script helps to automate the process of extraction into a specified folder.
 
 
-kali@kali:~/Desktop/Threat-Hunting-Tools$ ./logs-extractor.py --help
+kali@kali:~/Desktop/Threat-Hunting-Tools$ ./logs-extractor.py --help  
 usage: logs-extractor.py [-h] --archive  --extract-to  [--overwrite]
 
 Extracts (nested) .zip and (nested) .tar* logs
 
-optional arguments:
-  -h, --help     show this help message and exit
-  --archive      specify the /full/path/to/archive/
-  --extract-to   specify the /full/path/to/extract/to/
-  --overwrite    (optional) Overwrites any existing folder
+optional arguments:  
+  -h, --help     show this help message and exit  
+  --archive      specify the /full/path/to/archive/  
+  --extract-to   specify the /full/path/to/extract/to/  
+  --overwrite    (optional) Overwrites any existing folder  
 
 Example: ./logs-extractor.py --archive /media/csl/storage/TECHNET/Dec2021/ --extract-to /home/gerald/extracts/
+
+
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Second script to run would be evtx-converter.py
