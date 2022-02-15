@@ -17,7 +17,8 @@ optional arguments:
   --overwrite    (optional) Overwrites any existing folder
 
 Example: ./logs-extractor.py --archive /media/csl/storage/TECHNET/Dec2021/ --extract-to /home/gerald/extracts/
---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Second script to run would be evtx-converter.py
 Windows Servers would contain many Windows Event Logs that needs to be converted to json for readability and for yara scanning later on.
 
@@ -32,9 +33,10 @@ optional arguments:
   --target-dir   specify the /full/path/to/target/dir/ containing .evtx files.
   --dest-dir     specify the /full/path/to/dest/dir/ that you want the json files to be stored under.
   --overwrite    (optional) Overwrites any existing folder
-
+  
 Example: ./evtx-converter.py --target-dir /home/gerald/extracts/ --dest-dir /home/gerald/json/
---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Last script to run would be yara-spray.py
 This is just a lazy way to recursively perform a yara scan with a specified yara rule on all directories you supply recursively. And writes yara results to an
 output file.
