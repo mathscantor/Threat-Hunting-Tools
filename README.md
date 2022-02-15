@@ -17,8 +17,7 @@ optional arguments:
   --overwrite    (optional) Overwrites any existing folder  
 
 Example: ./logs-extractor.py --archive /media/csl/storage/TECHNET/Dec2021/ --extract-to /home/gerald/extracts/
-
-
+![image info](./screenshots/logs-extractor.png)
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Second script to run would be evtx-converter.py
