@@ -10,7 +10,7 @@ Server Admins often would give logs in archived form (.zip, .tar, .tar.gz etc.) 
 Second script to run would be evtx-converter.py
 Windows Servers would contain many Windows Event Logs that needs to be converted to json for readability and for yara scanning later on.
 
-![evtx-converter](./screenshots/converter.png)
+![evtx-converter](./screenshots/evtx-converter.png)
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Last script to run would be yara-spray.py
