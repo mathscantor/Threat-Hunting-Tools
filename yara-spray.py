@@ -71,11 +71,11 @@ def yara_scan(matches_list, yaraRule, yaraOutputPath):
         print("Current Progress: " + str(show_progress(fileIdx, totalFiles)) + "%")
         print(bcolors.OKGREEN + "[INFO] Scanning " + str(file) + "\n" + bcolors.ENDC)
         logger.info("Scanning " + str(file) + "\n")
-        command = "./dependencies/yara -c " + str(yaraRule) + " " + str(file).replace(" ", "\ ")  # number of hits
+        command = "./dependencies/yara -c " + str(yaraRule) + " \"" + str(file) + "\""  # number of hits
         f.write(DOTTED_LINE)
         f.write("#" + str(fileIdx) + " File Scanned: " + str(file) + "\n")
-        f.write("Number of hits: " + str(sp.getoutput(command)) + "\n")
-        command = "./dependencies/yara -s " + str(yaraRule) + " " + str(file).replace(" ", "\ ")
+        f.write("Number of rule hits: " + str(sp.getoutput(command)) + "\n")
+        command = "./dependencies/yara -s " + str(yaraRule) + " \"" + str(file) + "\""
         f.write(sp.getoutput(command)+"\n")
         f.flush()
         fileIdx += 1
@@ -116,4 +116,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
