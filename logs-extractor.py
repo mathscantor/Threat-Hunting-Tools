@@ -1,152 +1,124 @@
-#!/bin/python3
-
-#Author: Gerald (geraldlim619@gmail.com)
-
-import zipfile
+import logging
+import argparse
+import sys
 import os
 import pathlib
-import sys
-import logging
+import zipfile
 import tarfile
-import gzip
-import argparse
+import re
 
+def init_logging(verbose: bool=False,
+                 log_filepath: str=None) -> None:
+    
+    log_formatter = logging.Formatter("%(asctime)s [%(threadName)s] [%(funcName)s] [%(levelname)s] %(message)s")
+    if verbose:
+        log.setLevel(logging.DEBUG)
+    else:
+        log.setLevel(logging.INFO)
 
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+    consoleHandler = logging.StreamHandler(sys.stdout)
+    consoleHandler.setFormatter(log_formatter)
+    log.addHandler(consoleHandler)
 
-os.makedirs(os.path.dirname('./log/logs-extractor.log'), exist_ok=True)
-logging.basicConfig(filename='./log/logs-extractor.log', filemode='w', format='%(levelname)s - %(message)s')
-logger=logging.getLogger()
-logger.setLevel(logging.DEBUG)
+    if log_filepath is not None:
+        try:
+            os.makedirs(os.path.dirname(log_filepath), exist_ok=True)
+            log_filehandler = logging.FileHandler(log_filepath)
+            log_filehandler.setFormatter(log_formatter)
+            log.addHandler(log_filehandler)
+        except Exception as e:
+            log.error(f"Unable to create log file: {e}")
+            exit(1)
+    return
+    
+def check_user_args() -> None:
+    if not os.path.exists(args.input_dir):
+        log.error(f"Input directory '{args.input_dir}' does not exist!")
+        exit(1)
+    if not os.path.exists(args.output_dir):
+        try:
+            os.makedirs(args.output_dir)
+        except Exception as e:
+            log.error("Unable to create output directory!")
+            exit(1)
+    else:
+        if not args.force_overwrite:
+            log.warning("Please provide a new directory to extract to in order to avoid accidental overwrites. Use -f to ignore this warning.")
+            exit(1)
+    return
 
-def printMatchesList(matches_list):
-    for match in matches_list:
-        print(str(match))
+def recursive_extraction(archive: str, 
+                         extract_path: str,
+                         remove_archive=False):
+    
+    if archive.endswith(".zip"):
+        extract_zip(archive, extract_path, remove_archive)
+    elif archive.endswith((".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz")):
+        extract_tar(archive, extract_path, remove_archive)
 
+    for dirpath, _, files in os.walk(extract_path):
+        for file in files:
+            if re.search(archive_suffix_regex, file):
+                archive = os.path.join(dirpath, file)
+                recursive_extraction(archive, dirpath, True)
+    return
 
-def extract_nested_zip(zippedFile, toFolder, removeZip=False):
+def extract_zip(archive: str,
+                extract_path: str,
+                remove_archive=False) -> bool:
     try:
-        with zipfile.ZipFile(zippedFile, 'r') as zfile:
-            print(bcolors.OKGREEN + "[INFO] Extracting " + zippedFile + " to " + toFolder + "\n" + bcolors.ENDC)
-            logger.info("Extracting " + zippedFile + " to " + toFolder + "\n")
-            zfile.extractall(path=toFolder)
-        if removeZip:
-            os.remove(zippedFile)
+        log.debug(f"Extracting {archive} to {extract_path}")
+        with zipfile.ZipFile(archive, 'r') as zfile:
+            zfile.extractall(path=extract_path)
+        if remove_archive:
+            os.remove(archive)
     except:
-        print(bcolors.WARNING + "[WARNING] Failed to extract {0}".format(zippedFile) + bcolors.ENDC)
-        logger.warning("Failed to extract " + zippedFile)
+        log.warning(f"Failed to extract {archive}")
         return
+    return
 
-    for root, dirs, files in os.walk(toFolder):
-        for filename in files:
-            if filename.endswith(".zip"):
-                dest = os.path.join(root, filename[:-4])
-                fileSpec = os.path.join(root, filename)
-                extract_nested_zip(fileSpec, dest, True)
-
-
-def extract_nested_tar(tarFile, toFolder, removeTar=False):
+def extract_tar(archive: str, 
+                extract_path: str, 
+                remove_archive=False):
     try:
-        with tarfile.open(tarFile, 'r') as tfile:
-            print(bcolors.OKGREEN + "[INFO] Extracting " + tarFile + " to " + toFolder + "\n" + bcolors.ENDC)
-            logger.info("Extracting " + tarFile + " to " + toFolder + "\n")
-            def is_within_directory(directory, target):
-                
-                abs_directory = os.path.abspath(directory)
-                abs_target = os.path.abspath(target)
-            
-                prefix = os.path.commonprefix([abs_directory, abs_target])
-                
-                return prefix == abs_directory
-            
-            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
-            
-                for member in tar.getmembers():
-                    member_path = os.path.join(path, member.name)
-                    if not is_within_directory(path, member_path):
-                        raise Exception("Attempted Path Traversal in Tar File")
-            
-                tar.extractall(path, members, numeric_owner=numeric_owner) 
-                
-            
-            safe_extract(tfile, path=toFolder)
-        if removeTar:
-            os.remove(tarFile)
-    except:
-        print(bcolors.WARNING + "[WARNING] Failed to extract {0}".format(tarFile) + bcolors.ENDC)
-        logger.warning("Failed to extract " + tarFile)
-        return
-
-    for root, dirs, files in os.walk(toFolder):
-        for filename in files:
-            if filename.endswith(".tar.gz"):
-                dest = os.path.join(root, filename[:-7])
-                fileSpec = os.path.join(root, filename)
-                extract_nested_tar(fileSpec, dest, True)
-            elif filename.endswith(".tar"):
-                dest = os.path.join(root, filename[:-4])
-                fileSpec = os.path.join(root, filename)
-                extract_nested_tar(fileSpec, dest, True)
-
-def show_progress(fileIdx, totalFiles):
-    fileIdx = float(fileIdx)
-    return fileIdx/totalFiles * 100
+        log.debug(f"Extracting {archive} to {extract_path}")
+        with tarfile.open(archive, 'r:*') as tfile:
+            # In regards to CVE-2007-4559 Patch
+            # See https://docs.python.org/3.12/library/tarfile.html#tarfile-extraction-filter
+            tfile.extractall(path=extract_path, filter="tar")
+        if remove_archive:
+            os.remove(archive)
+    except Exception as e:
+        log.warning(f"Failed to extract {archive}: {e}")
+    return
 
 def main():
+    log.info("Starting extraction...")
+    archives = [
+        str(p) for p in pathlib.Path(args.input_dir).rglob("*")
+        if p.is_file() and re.search(archive_suffix_regex, p.name)
+    ]
 
-    parser = argparse.ArgumentParser(description='Extracts (nested) .zip and (nested) .tar* logs',
-            epilog='Example:\n'+sys.argv[0]+' --archive /media/csl/storage/TECHNET/Dec2021/ --extract-to /home/gerald/extracts/')
-    parser.add_argument('--archive', dest='archive', metavar='', type=str, required=True, help='specify the /full/path/to/archive/')
-    parser.add_argument('--extract-to', dest='extractTo', metavar='', type=str, required=True, help='specify the /full/path/to/extract/to/')
-    parser.add_argument('--overwrite', dest='overwrite', action='store_true', help='(optional) Overwrites any existing folder')
-    parser.set_defaults(overwrite=False)
-    args = parser.parse_args()
-
-    if os.path.exists(args.extractTo) and not args.overwrite:
-        print(bcolors.WARNING + "[WARNING] Please provide a new directory to extract to in order to avoid accidental overwrites. Use --overwrite to ignore this warning." + bcolors.ENDC)
-        return
-
-
-    parentLogsDirPath = args.archive
-    extractedFilesDir = args.extractTo
-
-    matches_zip = pathlib.Path(parentLogsDirPath).glob("**/*.zip")
-    matches_zip_list = sorted(matches_zip)
-    matches_tar = pathlib.Path(parentLogsDirPath).glob("**/*.tar*")
-    matches_tar_list = sorted(matches_tar)
-
-    totalFiles = len(matches_zip_list) + len(matches_tar_list)    
-    fileIdx = 1
-    for match_zip in matches_zip_list:
-        print("Current Progress: " + str(show_progress(fileIdx, totalFiles)) + "%")
-        logger.info("Current Progress: " + str(show_progress(fileIdx, totalFiles)) + "%")
-        fileIdx += 1
-        extractedFilesPath = extractedFilesDir + str(match_zip).replace(parentLogsDirPath, "").replace(".zip", "")
-        extract_nested_zip(str(match_zip), extractedFilesPath)
-
-    for match_tar in matches_tar_list:
-        print("Current Progress: " + str(show_progress(fileIdx, totalFiles)) + "%")
-        logger.info("Current Progress: " + str(show_progress(fileIdx, totalFiles)) + "%")
-        fileIdx += 1
-        extractedFilesPath = extractedFilesDir + str(match_tar).replace(parentLogsDirPath, "").replace(".tar", "").replace(".gz","")
-        extract_nested_tar(str(match_tar), extractedFilesPath)
-
-
-    print(bcolors.OKCYAN + "Finished Extracting all compressed files, including nested compressed files!" + bcolors.ENDC)
-    print(bcolors.OKCYAN + "Please check " + extractedFilesDir + " for extracted files!" + bcolors.ENDC)
-    logger.info("Finished Extracting all compressed files, including nested compressed files!")
-    logger.info("Please check " + extractedFilesDir + " for extracted files!")
-
+    for archive in archives:
+        recursive_extraction(archive=archive, extract_path=args.output_dir)
+    log.info(f"Finished extraction! Please check under '{args.output_dir}'")
+    return
 
 if __name__ == "__main__":
-    main()
 
+    parser = argparse.ArgumentParser(description='Recursively extracts (nested) compressed logs while keeping original directory tree.')
+    parser.add_argument("-i", "--input-dir", dest="input_dir", metavar="", type=str, required=True, help='The directory containing compressed logs')
+    parser.add_argument("-o", "--output-dir", dest="output_dir", metavar="", type=str, required=True, help='The directory to extract to')
+    parser.add_argument("-f", '--force-overwrite', dest='force_overwrite', action='store_true', help='Force extract to an existing directory.')
+    parser.add_argument("-v", '--verbose', dest='verbose', action='store_true', help='Show debug logs')
+    parser.add_argument("-l", "--log-file", dest="log_file", metavar="", type=str, required=False, help='Log the progress to a file')
+    parser.set_defaults(force_overwrite=False)
+    parser.set_defaults(verbose=False)
+    args = parser.parse_args()
+
+    log = logging.getLogger()
+    init_logging(log_filepath=args.log_file, verbose=args.verbose)
+    check_user_args()
+
+    archive_suffix_regex = re.compile(r'\.(zip|tar|tar\.gz|tgz|tar\.xz|txz|gz)$')
+    main()
