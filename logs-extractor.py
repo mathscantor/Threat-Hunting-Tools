@@ -174,7 +174,7 @@ def extract_xz(archive: str,
 def worker_task():
     while (True):
         with read_archives_head_lock:
-            log.debug(f"Remaining: {archives}")
+            # log.debug(f"Remaining: {archives}")
             if not archives:
                 break
             archive = archives.popleft()
