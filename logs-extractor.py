@@ -44,7 +44,7 @@ def check_user_args() -> None:
         log.error(f"Input directory '{args.input_dir}' does not exist!")
         exit(1)
     else:
-        if not os.path.isdir(args.output_dir):
+        if not os.path.isdir(args.input_dir):
             log.error("Stated input directory is not a directory!")
             exit(1)
 
@@ -99,18 +99,18 @@ def extract_zip(archive: str,
             zfile.extractall(path=extract_path)
         if remove_archive:
             os.remove(archive)
+        return True
     except zipfile.BadZipFile as e:
         log.warning(f"Failed to extract {archive}: {e}")
     except FileNotFoundError as e:
         log.warning(f"File does not exist: {e}")
     except PermissionError as e:
         log.warning(f"Permissions error: {e}")
-        return
-    return
+    return False
 
 def extract_tar(archive: str, 
                 extract_path: str, 
-                remove_archive=False):
+                remove_archive=False) -> bool:
     try:
         log.debug(f"Extracting {archive} to {extract_path}")
         with tarfile.open(archive, 'r:*') as tfile:
@@ -119,17 +119,18 @@ def extract_tar(archive: str,
             tfile.extractall(path=extract_path, filter="tar")
         if remove_archive:
             os.remove(archive)
+        return True
     except tarfile.TarError as e:
         log.warning(f"Failed to extract {archive}: {e}")
     except FileNotFoundError as e:
         log.warning(f"File does not exist: {e}")
     except PermissionError as e:
         log.warning(f"Permissions error: {e}")
-    return
+    return False
 
 def extract_gz(archive: str,
                extract_path: str,
-               remove_archive=False):
+               remove_archive=False) -> bool:
     
     archive_name = os.path.basename(archive)
     extract_path = os.path.join(extract_path, re.sub(r"\.gz$", "", archive_name))
@@ -141,17 +142,18 @@ def extract_gz(archive: str,
         shutil.copyfileobj(f_in, f_out)
         if remove_archive:
             os.remove(archive)
+        return True
     except gzip.BadGzipFile as e:
         log.warning(f"Unable to decompress GZ file: {e}")
     except FileNotFoundError as e:
         log.warning(f"File does not exist: {e}")
     except PermissionError as e:
         log.warning(f"Permissions error: {e}")
-    return
+    return False
     
 def extract_xz(archive: str,
                extract_path: str,
-               remove_archive=False):
+               remove_archive=False) -> None:
     
     archive_name = os.path.basename(archive)
     extract_path = os.path.join(extract_path, re.sub(r"\.xz$", "", archive_name))
@@ -163,15 +165,16 @@ def extract_xz(archive: str,
         shutil.copyfileobj(f_in, f_out)
         if remove_archive:
             os.remove(archive)
+        return True
     except lzma.LZMAError as e:
         log.warning(f"Unable to decompress XZ file: {e}")
     except FileNotFoundError as e:
         log.warning(f"File does not exist: {e}")
     except PermissionError as e:
         log.warning(f"Permissions error: {e}")
-    return
+    return False
 
-def worker_task():
+def worker_task() -> None:
     while (True):
         with read_archives_head_lock:
             # log.debug(f"Remaining: {archives}")
