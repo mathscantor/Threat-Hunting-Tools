@@ -38,9 +38,17 @@ def init_logging(verbose: bool=False,
     return
     
 def check_user_args() -> None:
+
+    # Check input directory
     if not os.path.exists(args.input_dir):
         log.error(f"Input directory '{args.input_dir}' does not exist!")
         exit(1)
+    else:
+        if not os.path.isdir(args.output_dir):
+            log.error("Stated input directory is not a directory!")
+            exit(1)
+
+    # Check output directory
     if not os.path.exists(args.output_dir):
         try:
             os.makedirs(args.output_dir)
