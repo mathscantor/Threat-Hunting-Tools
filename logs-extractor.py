@@ -6,6 +6,7 @@ import pathlib
 import zipfile
 import tarfile
 import gzip
+import lzma
 import shutil
 import re
 
@@ -28,7 +29,7 @@ def init_logging(verbose: bool=False,
             log_filehandler = logging.FileHandler(log_filepath)
             log_filehandler.setFormatter(log_formatter)
             log.addHandler(log_filehandler)
-        except Exception as e:
+        except PermissionError as e:
             log.error(f"Unable to create log file: {e}")
             exit(1)
     return
@@ -40,8 +41,8 @@ def check_user_args() -> None:
     if not os.path.exists(args.output_dir):
         try:
             os.makedirs(args.output_dir)
-        except Exception as e:
-            log.error("Unable to create output directory!")
+        except PermissionError as e:
+            log.error("Unable to create output directory: {e}")
             exit(1)
     else:
         if not args.force_overwrite:
@@ -59,6 +60,8 @@ def recursive_extraction(archive: str,
         extract_tar(archive, extract_path, remove_archive)
     elif archive.endswith(".gz"):
         extract_gz(archive, extract_path, remove_archive)
+    elif archive.endswith(".xz"):
+        extract_xz(archive, extract_path, remove_archive)
 
     for dirpath, _, files in os.walk(extract_path):
         for file in files:
@@ -76,8 +79,12 @@ def extract_zip(archive: str,
             zfile.extractall(path=extract_path)
         if remove_archive:
             os.remove(archive)
-    except:
-        log.warning(f"Failed to extract {archive}")
+    except zipfile.BadZipFile as e:
+        log.warning(f"Failed to extract {archive}: {e}")
+    except FileNotFoundError as e:
+        log.warning(f"File does not exist: {e}")
+    except PermissionError as e:
+        log.warning(f"Permissions error: {e}")
         return
     return
 
@@ -92,13 +99,18 @@ def extract_tar(archive: str,
             tfile.extractall(path=extract_path, filter="tar")
         if remove_archive:
             os.remove(archive)
-    except Exception as e:
+    except tarfile.TarError as e:
         log.warning(f"Failed to extract {archive}: {e}")
+    except FileNotFoundError as e:
+        log.warning(f"File does not exist: {e}")
+    except PermissionError as e:
+        log.warning(f"Permissions error: {e}")
     return
 
 def extract_gz(archive: str,
                extract_path: str,
                remove_archive=False):
+    
     archive_name = os.path.basename(archive)
     extract_path = os.path.join(extract_path, re.sub(r"\.gz$", "", archive_name))
 
@@ -109,12 +121,36 @@ def extract_gz(archive: str,
         shutil.copyfileobj(f_in, f_out)
         if remove_archive:
             os.remove(archive)
+    except gzip.BadGzipFile as e:
+        log.warning(f"Unable to decompress GZ file: {e}")
     except FileNotFoundError as e:
         log.warning(f"File does not exist: {e}")
     except PermissionError as e:
         log.warning(f"Permissions error: {e}")
     return
     
+def extract_xz(archive: str,
+               extract_path: str,
+               remove_archive=False):
+    
+    archive_name = os.path.basename(archive)
+    extract_path = os.path.join(extract_path, re.sub(r"\.xz$", "", archive_name))
+
+    try:
+        log.debug(f"Extracting {archive} to {extract_path}")
+        f_in = lzma.open(archive, 'rb')
+        f_out = open(extract_path, 'wb')
+        shutil.copyfileobj(f_in, f_out)
+        if remove_archive:
+            os.remove(archive)
+    except lzma.LZMAError as e:
+        log.warning(f"Unable to decompress XZ file: {e}")
+    except FileNotFoundError as e:
+        log.warning(f"File does not exist: {e}")
+    except PermissionError as e:
+        log.warning(f"Permissions error: {e}")
+    return
+
 def main():
     log.info("Starting extraction...")
     archives = [
@@ -144,5 +180,5 @@ if __name__ == "__main__":
     init_logging(log_filepath=args.log_file, verbose=args.verbose)
     check_user_args()
 
-    archive_suffix_regex = re.compile(r'\.(zip|tar|tar\.gz|tgz|tar\.xz|txz|gz)$')
+    archive_suffix_regex = re.compile(r'\.(zip|tar|tar\.gz|tgz|tar\.xz|txz|gz|xz)$')
     main()
