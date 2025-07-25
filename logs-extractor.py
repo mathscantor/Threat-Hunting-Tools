@@ -194,7 +194,7 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input-dir", dest="input_dir", metavar="", type=str, required=True, help='The directory containing compressed logs')
     parser.add_argument("-o", "--output-dir", dest="output_dir", metavar="", type=str, required=True, help='The directory to extract to')
     parser.add_argument("-j", "--threads", dest="threads", metavar="", type=int, required=False, help='The number of threads used for extraction (default: 1)')
-    parser.add_argument("-f", '--force-overwrite', dest='force_overwrite', action='store_true', help='Force extract to an existing directory.')
+    parser.add_argument("-f", '--force', dest='force_overwrite', action='store_true', help='Forcefully extract to an existing directory.')
     parser.add_argument("-v", '--verbose', dest='verbose', action='store_true', help='Show debug logs')
     parser.add_argument("-l", "--log-file", dest="log_file", metavar="", type=str, required=False, help='Log the progress to a file')
     parser.set_defaults(threads=1)
