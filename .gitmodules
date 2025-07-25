@@ -1,0 +1,3 @@
+[submodule "tests/evtx-conversion"]
+	path = tests/evtx-conversion
+	url = https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES.git

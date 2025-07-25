@@ -5,6 +5,8 @@ import os
 import pathlib
 import zipfile
 import tarfile
+import gzip
+import shutil
 import re
 
 def init_logging(verbose: bool=False,
@@ -55,6 +57,8 @@ def recursive_extraction(archive: str,
         extract_zip(archive, extract_path, remove_archive)
     elif archive.endswith((".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz")):
         extract_tar(archive, extract_path, remove_archive)
+    elif archive.endswith(".gz"):
+        extract_gz(archive, extract_path, remove_archive)
 
     for dirpath, _, files in os.walk(extract_path):
         for file in files:
@@ -92,6 +96,25 @@ def extract_tar(archive: str,
         log.warning(f"Failed to extract {archive}: {e}")
     return
 
+def extract_gz(archive: str,
+               extract_path: str,
+               remove_archive=False):
+    archive_name = os.path.basename(archive)
+    extract_path = os.path.join(extract_path, re.sub(r"\.gz$", "", archive_name))
+
+    try:
+        log.debug(f"Extracting {archive} to {extract_path}")
+        f_in = gzip.open(archive, "rb")
+        f_out = open(extract_path, "wb")
+        shutil.copyfileobj(f_in, f_out)
+        if remove_archive:
+            os.remove(archive)
+    except FileNotFoundError as e:
+        log.warning(f"File does not exist: {e}")
+    except PermissionError as e:
+        log.warning(f"Permissions error: {e}")
+    return
+    
 def main():
     log.info("Starting extraction...")
     archives = [
@@ -99,6 +122,7 @@ def main():
         if p.is_file() and re.search(archive_suffix_regex, p.name)
     ]
 
+    log.debug(f"Found {archives}")
     for archive in archives:
         recursive_extraction(archive=archive, extract_path=args.output_dir)
     log.info(f"Finished extraction! Please check under '{args.output_dir}'")
