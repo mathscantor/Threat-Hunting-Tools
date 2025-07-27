@@ -164,14 +164,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Yara scan on all logs from a given directory',
                                      epilog="Credits: https://github.com/VirusTotal/yara-x")
     
-    parser.add_argument("-i", "--input-dir", dest="input_dir", metavar="", type=str, required=True, help='The directory containing EVTX logs')
+    parser.add_argument("-i", "--input-dir", dest="input_dir", metavar="", type=str, required=True, help='The directory containing the plaintext logs')
     parser.add_argument("-y", "--yara-rule", dest="yara_rule", metavar="", type=str, required=True, help='The yara rule file.')
     parser.add_argument("-j", "--threads", dest="threads", metavar="", type=int, required=False, help='The number of threads used for extraction (default: 1)')
-    parser.add_argument("-f", '--force', dest='force_overwrite', action='store_true', help='Forcefully write serialized logs to non-empty directory')
     parser.add_argument("-v", '--verbose', dest='verbose', action='store_true', help='Show debug logs')
     parser.add_argument("-l", "--log-file", dest="log_file", metavar="", type=str, required=False, help='Log the progress to a file')
     parser.set_defaults(threads=1)
-    parser.set_defaults(force_overwrite=False)
     parser.set_defaults(verbose=False)
     args = parser.parse_args()
 
