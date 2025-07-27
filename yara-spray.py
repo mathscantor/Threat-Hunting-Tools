@@ -1,118 +1,201 @@
-#!/bin/python3
-
-# Author: Gerald (geraldlim619@gmail.com)
-
-import pathlib
-import sys
 import logging
-import subprocess as sp
-import datetime
-import re
-from glob import glob
-import os
 import argparse
+import sys
+import os
+import pathlib
+import re
+import threading
+from collections import deque
+import time
+import subprocess
+from typing import Tuple
+import platform
+import sys
+import stat
+import json
 
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    DEBUG = '\033[93m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+def init_logging(verbose: bool=False,
+                 log_filepath: str=None) -> None:
+    
+    log_formatter = logging.Formatter("%(asctime)s [%(threadName)s] [%(funcName)s] [%(levelname)s] %(message)s")
+    if verbose:
+        log.setLevel(logging.DEBUG)
+    else:
+        log.setLevel(logging.INFO)
 
-os.makedirs(os.path.dirname('./log/yara-spray.log'), exist_ok=True)
-logging.basicConfig(filename='./log/yara-spray.log', filemode='w', format='%(levelname)s - %(message)s')
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+    consoleHandler = logging.StreamHandler(sys.stdout)
+    consoleHandler.setFormatter(log_formatter)
+    log.addHandler(consoleHandler)
 
-DOTTED_LINE = "------------------------------------------------------------------------------------------------------\n"
+    if log_filepath is not None:
+        try:
+            os.makedirs(os.path.dirname(log_filepath), exist_ok=True)
+            log_filehandler = logging.FileHandler(log_filepath)
+            log_filehandler.setFormatter(log_formatter)
+            log.addHandler(log_filehandler)
+        except Exception as e:
+            log.error(f"Unable to create log file: {e}")
+            exit(1)
+    return
+    
+def check_user_args() -> None:
 
-def printMatchesList(matches_list):
-    for match in matches_list:
-        print(str(match))
-
-def init_all_list(listPathsToSpray):
-    extensions = ['.txt', '.log*', '.json', '.csv']
-
-    print(bcolors.DEBUG + "[DEBUG] Initializing .txt list..." + bcolors.ENDC)
-    print(bcolors.DEBUG + "[DEBUG] Initializing .log* list..." + bcolors.ENDC)
-    print(bcolors.DEBUG + "[DEBUG] Initializing .json list..." + bcolors.ENDC)
-    print(bcolors.DEBUG + "[DEBUG] Initializing .csv list..." + bcolors.ENDC)
-    logger.debug("Initializing .txt list...")
-    logger.debug("Initializing .log* list...")
-    logger.debug("Initializing .json list...")
-    logger.debug("Initializing .csv list...")
-    matches_list = []
-    for path in listPathsToSpray:
-        print(bcolors.DEBUG + "\t---> Fetching from " + path + bcolors.ENDC)
-        logger.debug("\t---> Fetching from " + path)
-        for extension in extensions:
-            matches_list.extend(pathlib.Path(path).glob("**/*"+extension))
-
-    return sorted(matches_list)
-
-
-def show_progress(fileIdx, totalFiles):
-    fileIdx = float(fileIdx)
-    return fileIdx/totalFiles * 100
-
-def yara_scan(matches_list, yaraRule, yaraOutputPath):
-
-    os.makedirs(os.path.dirname(yaraOutputPath), exist_ok=True)
-
-    f = open(yaraOutputPath, 'w')
-    fileIdx = 1
-    totalFiles = len(matches_list)
-    for file in matches_list:
-        print("Current Progress: " + str(show_progress(fileIdx, totalFiles)) + "%")
-        print(bcolors.OKGREEN + "[INFO] Scanning " + str(file) + "\n" + bcolors.ENDC)
-        logger.info("Scanning " + str(file) + "\n")
-        command = "./dependencies/yara -c " + str(yaraRule) + " \"" + str(file) + "\""  # number of hits
-        f.write(DOTTED_LINE)
-        f.write("#" + str(fileIdx) + " File Scanned: " + str(file) + "\n")
-        f.write("Number of rule hits: " + str(sp.getoutput(command)) + "\n")
-        command = "./dependencies/yara -s " + str(yaraRule) + " \"" + str(file) + "\""
-        f.write(sp.getoutput(command)+"\n")
-        f.flush()
-        fileIdx += 1
-    f.close()
+    # Check input directory
+    if not os.path.exists(args.input_dir):
+        log.error(f"Input directory '{args.input_dir}' does not exist!")
+        exit(1)
+    else:
+        if not os.path.isdir(args.input_dir):
+            log.error("Stated input directory is not a directory!")
+            exit(1)
     return
 
+def get_arch_and_os() -> Tuple[str, str]:
+    arch = platform.machine().lower()
+    os_name = sys.platform
+
+    if arch in ["x86_64", "amd64"]:
+        arch = "x86_64"
+    elif arch in ["aarch64", "arm64"]:
+        arch = "aarch64"
+    else:
+        log.error(f"This architecture ({arch}) is not supported!")
+        exit(1)
+
+    if os_name.startswith("linux"):
+        os_name = "linux"
+    elif os_name.startswith("win"):
+        os_name = "windows"
+    elif os_name.startswith("darwin"):
+        os_name = "macos"
+    else:
+        log.error(f"This OS ({os_name}) is not supported!")
+        exit(1)
+
+    # Hardcoded edge case here
+    # Currently, I cannot figure out how to statically cross compile an aarch64 windows binary using cargo.
+    if os_name == "windows" and arch == "aarch64":
+        log.error(f"Apologies, my friend. My potato brain hasn't figure out how to cross compile an aarch64 windows binary using cargo. A PR here will be much appreciated!")
+        exit(1)
+
+    return arch, os_name
+
+def yara_scan(scan_target: str) -> bool:
+
+    try:
+        log.info(f"Scanning '{scan_target}'")
+        # TODO
+        # -w to disable warning
+        # eg. ./bin/x86_64/linux/yara scan -w -s ./tests/yara-spray/log4j.yar ./tests/yara-spray/test.log
+        # proc = subprocess.Popen([bin_path, "scan", "-w", "-s", args.yara_rule, scan_target])
+        proc = subprocess.Popen([bin_path, "scan", "-w", "-s", "--output-format", "ndjson", args.yara_rule, scan_target], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, _ = proc.communicate()
+
+        try:
+            json_result = json.loads(stdout.decode('utf-8').strip())
+        except json.JSONDecodeError as e:
+            log.warning(f"Failed to decode json: {e}")
+            return False
+        
+        return_code = proc.returncode
+        if return_code != 0:
+            log.warning(f"Unable to scan {scan_target}")
+            return False
+        
+        # If there are no results, just end the post-processing and return True.
+        if len(json_result["rules"]) == 0:
+            return True
+        
+        with update_unique_results_lock:
+            results.append(json_result)
+
+    except subprocess.CalledProcessError as e:
+        log.warning(f"Failed to run '{bin_path}': {e}")
+    except PermissionError as e:
+        log.error(f"Unable to run '{bin_path}': {e}")
+        exit(1)
+
+    return True
+
+def get_formatted_results() -> str:
+
+    table = f"{'Log Path':<30} {'Rule':<45} {'String ID':<10} {'Offset':<10} {'Match'}\n"
+    table += "-" * 150 + "\n"
+
+    # Print rows
+    for result in results:
+        path = result['path']
+        for rule in result['rules']:
+            rule_id = rule['identifier']
+            for string in rule['strings']:
+                table += f"{path:<30} {rule_id:<45} {string['identifier']:<10} {hex(string['offset']):<10} {string['match']}\n"
+
+    return table
+
+def worker_task() -> None:
+    while (True):
+        with get_log_lock:
+            # log.debug(f"Remaining: {logs}")
+            if not scan_targets:
+                break
+            scan_target = scan_targets.popleft()
+        yara_scan(scan_target)
+    return
 
 def main():
+    start_time = time.time()
+    log.info(f"Starting yara spray with rule: {args.yara_rule}")
+    for _ in range(args.threads):
+        worker = threading.Thread(target=worker_task)
+        threads.append(worker)
+        worker.start()
 
-    parser = argparse.ArgumentParser(description='Perfoms a yara scan on directories containing [.csv, .txt, .json, .log*] files',
-            epilog='Example:\n'+sys.argv[0]+' --dirs /home/gerald/extracts/ /home/gerald/json/ /other/dir/to/scan/ --rule ./rule/jndi-detect.yar --output ./output/2022-02-14-output.txt')
-    parser.add_argument('--dirs', dest='dirs', metavar='', nargs='+', type=str, required=True, help='specify the full directory paths you wish to recursively scan using yara.')
-    parser.add_argument('--rule', dest='rule', metavar='', type=str, required=True, help='specify the path of the yara rule you wish to apply')
-    parser.add_argument('--output', dest='output', metavar='', type=str, required=True, help='specify the path of the yara output file') 
-    parser.add_argument('--overwrite', dest='overwrite', action='store_true', help='(optional) Overwrites any existing folder')
-    parser.set_defaults(overwrite=False)
-    args = parser.parse_args()
-    
-    yaraRule = args.rule
-    yaraOutputPath = args.output
-    if os.path.exists(yaraOutputPath) and not args.overwrite:
-        print(bcolors.WARNING + "[WARNING] Please provide a new yara output file to avoid accidental overwrites to the previous yara spray. Use --overwrite to ignore this warning." + bcolors.ENDC)
-        return
-    
-    if not os.path.exists(yaraRule):
-        print(bcolors.FAIL + "[FAIL] Yara rule not found!" + bcolors.ENDC)
-        return
+    for thread in threads:
+        thread.join()
 
-    listPathsToSpray = args.dirs
-    matches_list = init_all_list(listPathsToSpray)
-
-    yara_scan(matches_list, yaraRule, yaraOutputPath)
-    print(bcolors.OKCYAN + "Yara scan done for all (.json, .log*, .csv, .txt) files" + bcolors.ENDC)
-    print(bcolors.OKCYAN + "Please check " + yaraOutputPath + " for results!" + bcolors.ENDC)
-    logger.info("Finished yara scan for all (.json, .log*, .csv, .txt) files")
-    logger.info("Please check " + yaraOutputPath + " for results!")
-
+    end_time = time.time()
+    total_time = end_time - start_time
+    log.info(f"Results:\n{get_formatted_results()}")
+    log.info(f"Finished yara spray in {total_time:.5f}s!")
+    return
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Yara scan on all logs from a given directory',
+                                     epilog="Credits: https://github.com/VirusTotal/yara-x")
+    
+    parser.add_argument("-i", "--input-dir", dest="input_dir", metavar="", type=str, required=True, help='The directory containing EVTX logs')
+    parser.add_argument("-y", "--yara-rule", dest="yara_rule", metavar="", type=str, required=True, help='The yara rule file.')
+    parser.add_argument("-j", "--threads", dest="threads", metavar="", type=int, required=False, help='The number of threads used for extraction (default: 1)')
+    parser.add_argument("-f", '--force', dest='force_overwrite', action='store_true', help='Forcefully write serialized logs to non-empty directory')
+    parser.add_argument("-v", '--verbose', dest='verbose', action='store_true', help='Show debug logs')
+    parser.add_argument("-l", "--log-file", dest="log_file", metavar="", type=str, required=False, help='Log the progress to a file')
+    parser.set_defaults(threads=1)
+    parser.set_defaults(force_overwrite=False)
+    parser.set_defaults(verbose=False)
+    args = parser.parse_args()
+
+    log = logging.getLogger()
+    init_logging(log_filepath=args.log_file, verbose=args.verbose)
+    check_user_args()
+
+    # Globals
+    scan_target_suffix_regex = re.compile(r"\.(log|txt|out|err|report|trace|dump|xml|json|jsonl|ndjson)(\.\d+)?$", re.IGNORECASE)
+    scan_targets = deque([
+        str(p) for p in pathlib.Path(args.input_dir).rglob("*")
+        if p.is_file() and re.search(scan_target_suffix_regex, p.name)
+    ])
+
+    arch, os_name = get_arch_and_os()
+    if os_name == "windows":
+        bin_path = f"./bin/{arch}/{os_name}/yara.exe"
+    else:
+        bin_path = f"./bin/{arch}/{os_name}/yara"
+    os.chmod(bin_path, os.stat(bin_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    get_log_lock = threading.Lock()
+    update_unique_results_lock = threading.Lock()
+    threads = list()
+
+    results = list()
     main()
